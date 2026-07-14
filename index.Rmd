@@ -74,7 +74,18 @@ data <- data %>%
       str_replace("^WSUP\\.", "WSUP") %>%                          # remove period
       str_replace("^WSUP(\\d)", "WSUP \\1") %>%                    # add missing space
       str_squish()                                                 # clean extra spaces
-      )
+      )%>%
+   mutate(
+    field.plant.health.condition = factor(
+      field.plant.health.condition,
+      levels = c(
+        "Dead",
+        "Poor",
+        "Fair",
+        "Good",
+        "No Selection"
+      )))
+
 ```
 
 
@@ -160,6 +171,13 @@ ggplot(
   facet_wrap(~location) +
   theme_bw()+ 
   guides(fill="none")+
+  scale_fill_manual(
+    values = c(
+      "Dead"         = "#67000D",
+      "Poor"         = "#A50F15",
+      "Fair"         = "#CB5A52",
+      "Good"         = "#EFABA2",
+      "No Selection" = "#E0E0E0"))+
   labs(    
     x = "Health Condition",
     y = "Number of plants"
@@ -176,6 +194,14 @@ ggplot(
 ) +
   geom_bar() +
   facet_wrap(~ location,nrow=1) +
+  scale_fill_manual(
+    values = c(
+      "Dead"         = "#67000D",
+      "Poor"         = "#A50F15",
+      "Fair"         = "#CB5A52",
+      "Good"         = "#EFABA2",
+      "No Selection" = "#E0E0E0"
+    )) +
   coord_flip() +
   scale_x_discrete(labels = function(x) parse(text = paste0("italic('", x, "')"))) +
   theme_bw() +
