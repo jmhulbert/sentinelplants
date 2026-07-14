@@ -1,0 +1,353 @@
+---
+title: "Sentinel Project Analyses"
+output:
+  pdf_document: default
+  html_document: default
+date: "2026-06-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(kableExtra)
+```
+
+
+## Observations
+
+```{r}
+data <-read.csv("./data/observations-7.13.26.csv")
+#data <- data[c(1,4,8,14,43,47:60)]
+```
+
+```{r}
+data <- data %>%
+  mutate(
+    location = case_when(
+      str_starts(field.plant.number..from.tag.or.map., "POT") ~ "Port of Tacoma",
+      TRUE ~ "WSU"
+  )
+) %>%
+  mutate(
+    field.plant.health.condition = case_when(
+      is.na(field.plant.health.condition) ~ "No Selection",
+      field.plant.health.condition == "" ~ "No Selection",
+      TRUE ~ field.plant.health.condition
+    ) 
+  ) %>%
+   mutate(
+    scientific_name = str_trim(scientific_name),
+    scientific_name = recode(
+      scientific_name,
+      "Quercus garryana garryana" = "Quercus garryana",
+      "Pseudotsuga" = "Pseudotsuga menziesii"
+    )
+  ) %>%
+   filter(
+    !is.na(scientific_name),
+    scientific_name != "",
+    !is.na(`field.plant.number..from.tag.or.map.`),
+    `field.plant.number..from.tag.or.map.` != ""
+  ) %>% 
+   mutate(
+    observed_on = as.Date(observed_on),
+    scientific_name = factor(scientific_name),
+    field.plant.health.condition = factor(field.plant.health.condition),
+    field.foliage...insect.feeding = factor(field.foliage...insect.feeding),
+    field.foliage...deformation = factor(field.foliage...deformation),
+    field.woody.tissue....structural.damage = factor(field.woody.tissue....structural.damage),
+    field.woody.tissue...signs.of.disease = factor(field.woody.tissue...signs.of.disease),
+    field.woody.tissue...insect.activity = factor(field.woody.tissue...insect.activity),
+    field.woody.tissue...symptoms = factor(field.woody.tissue...symptoms),
+    field.root.collar...signs.of.disease = factor(field.root.collar...signs.of.disease),
+    field.critical.root.zone..within.canopy.drip.line....damage.or.concerns =
+    factor(field.critical.root.zone..within.canopy.drip.line....damage.or.concerns),
+    location = factor(location) 
+    )%>%
+   mutate(
+    field.plant.number..from.tag.or.map. =
+      field.plant.number..from.tag.or.map. %>%
+      str_replace(regex("^wsup", ignore_case = TRUE), "WSUP") %>%  # fix capitalization
+      str_replace("^WSUP\\.", "WSUP") %>%                          # remove period
+      str_replace("^WSUP(\\d)", "WSUP \\1") %>%                    # add missing space
+      str_squish()                                                 # clean extra spaces
+      )
+```
+
+
+
+```{r}
+Plant.Summary <- data %>%
+  group_by(location) %>%
+  summarise(
+    Observations = n(),
+    Unique.Plants = n_distinct(field.plant.number..from.tag.or.map.)
+  )
+```
+
+**At WSU,  `r Plant.Summary$Unique.Plants[Plant.Summary$location=="WSU"]` sentinel plants were monitored through `r Plant.Summary$Observations[Plant.Summary$location=="WSU"]` observations. **
+
+**At the Port of Tacoma, `r Plant.Summary$Unique.Plants[Plant.Summary$location=="Port of Tacoma"]` sentinel plants were monitored through `r Plant.Summary$Observations[Plant.Summary$location=="Port of Tacoma"]` observations.**
+
+## Data Visualization
+
+
+### Observations by date
+
+```{r}
+obs.by.date <- data %>%
+ mutate(observed_on = as.Date(observed_on)) %>%
+  count(observed_on, location)
+```
+
+
+```{r fig.height=5, fig.width=10}
+pd <- position_dodge2(width = 0.9, preserve = "single")
+ggplot(obs.by.date,
+       aes(observed_on, n, fill = location)) +
+  geom_col(
+    position = pd,
+    width = 0.8
+  ) +
+  geom_text(
+    aes(label = n),
+    position = pd,
+    vjust = -0.3,
+    size = 3
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_bw() +
+  labs(
+    x = "Observation Date",
+    y = "Number of Plants Monitored",
+    fill = "Location"
+  )
+```
+
+
+
+```{r}
+most.recent.data <- data %>%
+  mutate(observed_on = as.Date(observed_on)) %>%
+  group_by(field.plant.number..from.tag.or.map.) %>%
+  slice_max(observed_on, n = 1, with_ties = FALSE) %>%
+  ungroup()
+```
+
+
+### Most Recent Data
+
+The plots below filter out the first observations of each plant if it was measured more than once so far this summer. 
+
+```{r fig.height=5, fig.width=10}
+ggplot(
+  most.recent.data,
+  aes(field.plant.health.condition,
+      fill = field.plant.health.condition)
+) +
+  geom_bar() +
+  stat_count(
+    aes(label = after_stat(count)),
+    geom = "text",
+    hjust = -0.2
+  ) +
+  coord_flip() +
+  facet_wrap(~location) +
+  theme_bw()+ 
+  guides(fill="none")+
+  labs(    
+    x = "Health Condition",
+    y = "Number of plants"
+    )
+```
+
+```{r fig.height=5, fig.width=10}
+ggplot(
+  most.recent.data,
+  aes(
+    x = scientific_name,
+    fill = field.plant.health.condition
+  )
+) +
+  geom_bar() +
+  facet_wrap(~ location,nrow=1) +
+  coord_flip() +
+  scale_x_discrete(labels = function(x) parse(text = paste0("italic('", x, "')"))) +
+  theme_bw() +
+  labs(
+    x = "Species",
+    y = "Number of plants",
+    fill = "Health Condition"
+  )
+```
+
+```{r}
+Health.Conflicts <- data %>%
+  group_by(`field.plant.number..from.tag.or.map.`) %>%
+  filter(n_distinct(`field.plant.health.condition`, na.rm = TRUE) > 1) %>%
+  arrange(`field.plant.number..from.tag.or.map.`)
+```
+
+\newpage
+
+## Observations where condition changed
+
+```{r}
+Health.Conflict.Summary <- data %>%
+  group_by(`field.plant.number..from.tag.or.map.`,scientific_name) %>%
+  summarise(
+    n_entries = n(),
+    n_health_conditions = n_distinct(`field.plant.health.condition`, na.rm = TRUE),
+    health_conditions = paste(unique(na.omit(`field.plant.health.condition`)), collapse = ", "),
+    .groups = "drop"
+  ) %>%
+  filter(n_health_conditions > 1) %>%
+  arrange(`field.plant.number..from.tag.or.map.`)
+kable(Health.Conflict.Summary[c(1:3,5)])
+
+```
+
+\newpage
+
+
+## Observations where conditions got worse
+
+
+```{r}
+# Good <-> Fair
+
+good_fair <- Health.Conflict.Summary %>%
+
+  filter(health_conditions %in% c("Good, Fair", "Fair, Good"))
+
+# Fair <-> Poor
+
+fair_poor <- Health.Conflict.Summary %>%
+
+  filter(health_conditions %in% c("Fair, Poor", "Poor, Fair"))
+
+# Dead transitions
+
+dead_transition <- Health.Conflict.Summary %>%
+
+  filter(str_detect(health_conditions, "Dead")) %>%
+
+  filter(
+
+    str_detect(health_conditions, "Poor") |
+
+    str_detect(health_conditions, "Fair")
+
+  )
+
+```
+
+
+### Good <-> Fair
+```{r}
+kable(good_fair)
+```
+
+
+\newpage
+
+### Fair <-> Poor
+
+```{r}
+kable(fair_poor)
+```
+
+
+\newpage
+
+### Dead transitions
+
+```{r}
+kable(dead_transition)
+```
+
+
+\newpage
+
+### All records with Dead
+
+```{r}
+
+All_Dead <- data %>%
+
+  filter(`field.plant.health.condition` == "Dead") %>%
+
+  group_by(`field.plant.number..from.tag.or.map.`, scientific_name) %>%
+
+  summarise(
+
+    n_dead_records = n(),
+
+    n_total_records = n_distinct(observed_on), # replace with your date field if desired
+
+    .groups = "drop"
+
+  ) %>%
+
+  arrange(`field.plant.number..from.tag.or.map.`)
+
+kable(All_Dead)
+```
+
+\newpage
+
+
+
+## Plants with insect activity
+
+```{r}
+insect.activity <- data %>% 
+  filter(
+    field.woody.tissue...insect.activity != "No Selection" & 
+    field.woody.tissue...insect.activity != "None" &
+    field.woody.tissue...insect.activity != "Not Sure" &
+    field.woody.tissue...insect.activity != "" 
+  ) %>%
+  droplevels() %>%
+  group_by(field.plant.number..from.tag.or.map.,scientific_name) %>%
+  summarize(
+    n_entries = n(),
+    n_signs.of.disease = n_distinct(field.woody.tissue...insect.activity, na.rm = TRUE),
+    insect.activity = paste(unique(na.omit(field.woody.tissue...insect.activity)), collapse = ", "),
+    .groups = "drop"
+    ) %>%
+  arrange(field.plant.number..from.tag.or.map.)
+kable(insect.activity[c(1,2,5)])
+```
+
+
+\newpage
+
+## Plants with stem disease
+
+
+```{r}
+signs.of.disease <- data %>% 
+  filter(
+    field.woody.tissue...signs.of.disease != "No Selection" & 
+    field.woody.tissue...signs.of.disease != "None" &
+    field.woody.tissue...signs.of.disease != "Not Sure" &
+    field.woody.tissue...signs.of.disease != "" 
+  ) %>%
+  droplevels() %>%
+  group_by(field.plant.number..from.tag.or.map.,scientific_name) %>%
+  summarize(
+    n_entries = n(),
+    n_signs.of.disease = n_distinct(field.woody.tissue...signs.of.disease, na.rm = TRUE),
+    signs.of.disease = paste(unique(na.omit(field.woody.tissue...signs.of.disease)), collapse = ", "),
+    .groups = "drop"
+    ) %>%
+  arrange(field.plant.number..from.tag.or.map.)
+kable(signs.of.disease[c(1,2,5)])
+```
+
