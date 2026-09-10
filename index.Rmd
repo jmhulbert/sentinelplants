@@ -19,7 +19,7 @@ library(kableExtra)
 ## Observations
 
 ```{r}
-data <-read.csv("./data/observations-8.21.26.csv")
+data <-read.csv("./data/observations-9.10.26.csv")
 #data <- data[c(1,4,8,14,43,47:60)]
 ```
 
