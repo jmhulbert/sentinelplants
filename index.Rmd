@@ -7,7 +7,7 @@ date: "`r format(Sys.Date(), '%B %d, %Y')`"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r message=FALSE, warning=FALSE}
@@ -19,7 +19,7 @@ library(kableExtra)
 ## Observations
 
 ```{r}
-data <-read.csv("./data/observations-9.10.26.csv")
+data <-read.csv("./data/observations-9.28.26.csv")
 #data <- data[c(1,4,8,14,43,47:60)]
 ```
 
